@@ -1,0 +1,538 @@
+---
+title: "Trabajo segmentación"
+author: 
+ - "Yubar Daniel Marín"
+ - "Yosel Del Valle"
+ - "Mateo Tuberquia"
+ - "Brayan Enrique Perez"
+date: "16 de mayo de 2018"
+output: pdf_document
+---
+
+##Introducción
+
+Debido a la heterogeneidad del mercado, dirigir estrategias de marketing generales para todos los clientes se ha convertido en algo inútil; por esta razón a surgido la necesidad de dividir el mercado en grupos cuyos integrantes tengas ciertas características que los asemejen y peritan a la empresa implementar estrategias de mercadotecnia que minimizan cosos y que obtener un resultado más satisfactorio.
+
+##Método 
+
+Para realizar la segmentación se implementará el algoritmo *K-means* el cual es un método de clustering que pertenece a la categoría de aprendizaje no supervisado. Lo que se busca con este método es crear grupos de observaciones con características similares, y así maximizar la variación entre grupos y minimizarla dentro de cada grupo.
+
+Se selecciono este método de clasificación ya que es rápido y con almacenamiento reducido ya que solo se necesitan guardar los *K* centroides seleccionados. 
+
+##Procedimiento
+
+### Escalar los datos
+
+
+```{r echo=FALSE,message=FALSE}
+base <- read.delim("base4.txt",header = T)
+
+
+require(MASS)
+
+maxs <- apply(base[,2:ncol(base)], 2, max)
+mins <- apply(base[,2:ncol(base)], 2, min)
+
+escala <- scale(base[,2:ncol(base)])
+escala <- as.data.frame(escala)
+
+```
+
+
+Lo primero que debemos hacer es escalar las variables con el fin de evitar que algunas tengan más peso que las demás. En este caso utilizaremos el método *Max-Min* representado matemáticamente de la siguiente forma:
+
+
+$$x'_1=(max_{objetivo}-min_{objetivo}) *[\frac{x_i-min_{valor}}{max_{valor}-min_{valor}}]+min_{objetivo} $$
+
+- $x'_1=$  Entrada normalizada de índice i.
+
+- $x_i=$  Entrada de índice i. 
+
+- $max_{objetivo}=$ Valor máximo del rango en el que quiero aplicar las entradas
+
+- $max_{objetivo}=$ Valor máximo del rango en el que quiero aplicar las entradas.
+
+- $max_{valor}=$ Valor máximo real de las entradas.
+
+- $min_{valor}=$ valor máximo real de las entradas.
+
+
+###Determinación del número de clúster óptimo
+
+#### Análisis de la varianza entre grupos
+
+Debemos asignar el número de óptimo clúster   para la segmentación por lo que debemos probar desde el 1 hasta el número de clúster que consideramos como un número máximo a permitir en nuestro caso es de 1 a 15, siendo el número máximo de grupos que permitiremos.
+
+En el siguiente grafica podemos observar la relación entre el número de clúster y el valor de la suma de cuadrados Inter grupos teniendo siempre presente que se prefiere una varianza mayor entre los grupos.
+
+
+
+```{r echo=FALSE, message=FALSE,warning=FALSE}
+set.seed(278)
+entre <- kmeans(escala,centers = 1)$betweenss
+for (i in 2:15) entre[i] <- kmeans(escala,centers = i)$betweenss
+plot(1:15,entre,type = "b",xlab = "Número de cluster",ylab = "Varianza entre grupos", main = "Número de clouster óptimos") 
+```
+La grafica anterior nos permite reconocer puntos de corte, debemos recordar que se prefieren número de clúster con mayores varianzas entre grupos, en este caso un buen punto de corte puede ser 8, ya que se puede observar un decaimiento entre este punto y el siguiente.
+
+Sabemos que el método *K-means* asigna de forma aleatoria los puntos que serán tomadas como las medias de cada subgrupo por lo que cada que se ejecute el siguiente código el cual permite generar las grafica anterior obtendremos un resultado diferente.
+
+
+```{r eval=FALSE}
+
+# Varificación de la varianza entre grupos posibles de 1 a 15 clouster
+Varianza.en.grupo <- kmeans(escala,centers = 1)$betweenss
+for (i in 2:15) entre[i] <- kmeans(escala,centers = i)$betweenss
+
+#grafica de la varianza entre clouster
+plot(1:15,entre,type = "b",xlab = "Número de cluster",
+     ylab = "Varianza entre grupos", main = "Número de clouster óptimos") 
+```
+
+El anterior código fue ejecutado 52 veces y se obtuvieron los siguientes resultados.
+
+ Número de clouster| Total de apariciones
+ ------------------|------------------------
+ 6|2
+ 7|6
+ 8|10
+ 9|10
+ 10|9
+ 11|5
+ 12|4
+ 13|3
+ 14|2
+
+De la anterior tabla podemos observar que el número de veces que se seleccionaron 8 clúster y 9 clúster como número es óptimo es de 10, otra posible selección será 10 clúster con un total de aprisiones de 9.
+
+#### Análisis de la varianza dentro de cada grupo
+
+Ahora analizares el grafico recursivo de la varianza entre los elementos de cada grupo. En este caso utilizaremos un código similar al anterior, la única diferencia es que se remplaza `betienses` por `withinss`
+
+
+```{r echo=FALSE,message=FALSE,warning=FALSE}
+set.seed(3595)
+intro <- kmeans(escala,centers = 1)$withinss
+for (i in 2:15) intro[i] <- kmeans(escala,centers = i)$withinss
+plot(1:15,intro,type = "b",xlab = "Número de cluster",ylab = "Varianza dentro de cada grupo", main = "Número de clouster óptimos") 
+
+```
+La idea es tener un criterio de selección de numero de clúster óptimo, debemos recordar que se prefieren un numero de clúster en el cual la varianza dentro del grupo sea menor, en la gráfica anterior se puede observar que hay un incremento obvio en la varianza tenemos 8 grupos y 9 clúster.
+
+Así por el criterio anterior se selección como número óptimo de clúster 8 ya que se observar un comportamiento decreciente para la varianza cuando tenemos un número inferior de clúster.
+
+Finalmente se debe aclarar que para un número inferior al seleccionado la varianza es decreciente, pero por el criterio de la primera grafica se rechazaron y para un número superior de clúster como 9 y 10 aunque podrían ser aceptados, la varianza en las gráficas probadas con el criterio anterior nunca llegó a ser decrecientes hasta estos cortes.
+
+###Creación de los subgrupos
+
+```{r echo=FALSE}
+set.seed(123)
+clu8 <- kmeans(escala,centers =8)
+
+```
+
+Las medidad obtenidas con la tecnica *K-means* con un total de 8 grupos son:
+
+* La inercia total es de 102672
+* La inercia entre grupos es de 31989.67
+* la inercia dentro cada uno de los 8 grupos es de :
+  1. 881.617 
+  2. 5117.989
+  3. 16094.385
+  4. 10536.707
+  5. 9616.878
+  6. 8665.118 
+  7. 7700.730
+  8. 7068.905
+
+
+# Utilidad de la segmentación para la empresa
+
+Ahora se presenta la utilidad del procedimiento de  segmentación propuesto, para esto muestran graficas que nos presentan las frecuencia de cada una de las categorias en cada variable y en cada clúster. Ademas se presentan tablas con la inversion promedio   de un cliente que pertenece a cada  clúster en cada uno de los productos ofrecidos. 
+
+
+
+
+```{r echo=FALSE}
+seg <- data.frame(base[1],clu8$cluster) 
+```
+
+
+```{r echo=FALSE}
+
+base <- data.frame(clu8$cluster,base)
+b1 <- subset(base,base$clu8.cluster==1)
+b2 <- subset(base,base$clu8.cluster==2)
+b3 <- subset(base,base$clu8.cluster==3)
+b4 <- subset(base,base$clu8.cluster==4)
+b5 <- subset(base,base$clu8.cluster==5)
+b6 <- subset(base,base$clu8.cluster==6)
+b7 <- subset(base,base$clu8.cluster==7)
+b8 <- subset(base,base$clu8.cluster==8)
+
+
+
+
+```
+
+
+#Gráficos de la  frecuencia de variable ¿Tienen ventas fisicas? en cada clúster
+
+
+```{r echo=FALSE}
+par(mfrow=c(2,4))
+barplot(table(b1$tiene_ventas_fisicas),main = "¿Tiene ventas físicas?",ylim = c(0,450),col = c(1),xlab = "G1")
+barplot(table(b2$tiene_ventas_fisicas),main = "¿Tiene ventas físicas?",ylim = c(0,500),col = c(1),xlab = "G2")
+barplot(table(b3$tiene_ventas_fisicas),main = "¿Tiene ventas físicas?",ylim = c(0,450),col = c(1),xlab = "G3")
+barplot(table(b4$tiene_ventas_fisicas),main = "¿Tiene ventas físicas?",ylim = c(0,450),col = c(1),xlab = "G4")
+barplot(table(b5$tiene_ventas_fisicas),main = "¿Tiene ventas físicas?",ylim = c(0,450),col = c(1),xlab = "G5")
+barplot(table(b6$tiene_ventas_fisicas),main = "¿Tiene ventas físicas?",ylim = c(0,450),col = c(1),xlab = "G6")
+barplot(table(b7$tiene_ventas_fisicas),main = "¿Tiene ventas físicas?",ylim = c(0,450),col = c(1),xlab = "G7")
+barplot(table(b8$tiene_ventas_fisicas),main = "¿Tiene ventas físicas?",ylim = c(0,450),col = c(1),xlab = "G8")
+```
+
+En esta grafica representamos como G1 la frecuencia referida al clúster 1, G2 La frecuencia referida al clúster 2 y así sucesivamente hasta G8 que representa al clúster 8.
+
+En el G1 y G6 solo encontramos ventas físicas en a proporción muy baja, en el grupo G2 no encontramos ventas físicas, en los grupos G5 y G8 encontramos una proporción más alta de ventas física al ser comparados con los otros grupos y en los grupos G4 y G7 predomina la proporción de clientes que no realizan ventas físicas.
+
+
+#Gráficos de la  frecuencia de variable ¿Tienen ventas electronicas? en cada clúster
+
+```{r echo=FALSE}
+par(mfrow=c(2,4))
+barplot(table(b1$tiene_ventas_electronicas),main = "Ventas electronicas",ylim = c(0,10),col = c(2),xlab = "G1")
+barplot(table(b2$tiene_ventas_electronicas),main = "Ventas electronicas",ylim = c(0,650),col = c(2),xlab = "G2")
+barplot(table(b3$tiene_ventas_electronicas),main = "Ventas electronicas",ylim = c(0,650),col = c(2),xlab = "G3")
+barplot(table(b4$tiene_ventas_electronicas),main = "Ventas electronicas",ylim = c(0,650),col = c(2),xlab = "G4")
+barplot(table(b5$tiene_ventas_electronicas),main = "Ventas electronicas",ylim = c(0,650),col = c(2),xlab = "G5")
+barplot(table(b6$tiene_ventas_electronicas),main = "Ventas electronicas",ylim = c(0,50),col = c(2),xlab = "G6")
+barplot(table(b7$tiene_ventas_electronicas),main = "Ventas electronicas",ylim = c(0,650),col = c(2),xlab = "G7")
+barplot(table(b8$tiene_ventas_electronicas),main = "Ventas electronicas",ylim = c(0,650),col = c(2),xlab = "G8")
+
+```
+En esta grafica representamos como G1 la frecuencia referida al clúster 1, G2 La frecuencia referida al clúster 2 y así sucesivamente hasta G8 que representa al clúster 8.
+
+Los grupos G2, G3, G4, G5, G6, G7, G8 predominan las empresas que no realizan ventas electrónicas, en el grupo G1  encontramos las empresas con la mayor proporción de ventas electrónicas.
+
+
+#Gráficos de la  frecuencia de variable ciclo financiero en cada clúster
+
+```{r echo=FALSE}
+par(mfrow=c(2,4))
+barplot(table(b1$ciclo_financiero),main = "Ciclo financiero ",ylim = c(0,10),col = c(3),xlab = "G1")
+barplot(table(b2$ciclo_financiero),main = "Ciclo financiero",ylim = c(0,300),col = c(3),xlab = "G2")
+barplot(table(b3$ciclo_financiero),main = "Ciclo financiero  ",ylim = c(0,300),col = c(3),xlab = "G3")
+barplot(table(b4$ciclo_financiero),main = "Ciclo financiero",ylim = c(0,300),col = c(3),xlab = "G4")
+barplot(table(b5$ciclo_financiero),main = "Ciclo financiero",ylim = c(0,300),col = c(3),xlab = "G5")
+barplot(table(b6$ciclo_financiero),main = "Ciclo financiero",ylim = c(0,20),col = c(3),xlab = "G6")
+barplot(table(b7$ciclo_financiero),main = "Ciclo financiero",ylim = c(0,300),col = c(3),xlab = "G7")
+barplot(table(b8$ciclo_financiero),main = "Ciclo financiero",ylim = c(0,300),col = c(3),xlab = "G8")
+
+```
+En esta grafica representamos como G1 la frecuencia referida al clúster 1, G2 La frecuencia referida al clúster 2 y así sucesivamente hasta G8 que representa al clúster 8 .
+
+Los grupos G1 y G6 tienes el menor número de ciclo financiero al ser comparados con los demás grupos, las categorías ciclo financieros tipo 4 predomina en los grupos G3, G7. Los grupos G2 y G8 predominan el número rotación de cuentas por cobrar tipo 2 y 3, y  en los grupos G4 y G5 tienemos una mayor porporción de ciclo financiero categorizado como 6.
+
+#Gráficos de la  frecuencia de variable ciclo de negocio en cada clúster
+
+```{r echo=FALSE}
+par(mfrow=c(2,4))
+barplot(table(b1$ciclo_negocio),main = "Ciclo negocio ",ylim = c(0,10),col = c(4),xlab = "G1")
+barplot(table(b2$ciclo_negocio),main = "Ciclo negocio ",ylim = c(0,300),col = c(4),xlab = "G2")
+barplot(table(b3$ciclo_negocio),main = "Ciclo negocio ",ylim = c(0,300),col = c(4),xlab = "G3")
+barplot(table(b4$ciclo_negocio),main = "Ciclo negocio ",ylim = c(0,300),col = c(4),xlab = "G4")
+barplot(table(b5$ciclo_negocio),main = "Ciclo negocio ",ylim = c(0,300),col = c(4),xlab = "G5")
+barplot(table(b6$ciclo_negocio),main = "Ciclo negocio ",ylim = c(0,10),col = c(4),xlab = "G6")
+barplot(table(b7$ciclo_negocio),main = "Ciclo negocio ",ylim = c(0,300),col = c(4),xlab = "G7")
+barplot(table(b8$ciclo_negocio),main = "Ciclo negocio ",ylim = c(0,300),col = c(4),xlab = "G8")
+
+```
+
+En esta grafica representamos como G1 la frecuencia referida al clúster 1, G2 La frecuencia referida al clúster 2 y así sucesivamente hasta G8 que representa al clúster 8 .
+
+En el grafico G1 encontramos el ciclo de negocios constantes para las categorías 1,2,3,6.En el gráfico G2 encontramos que las categorías con mayor frecuencia de ciclo de negocios son 2,3,4,1 respectivamente y las de menor frecuencia de ciclo de negocio son las categorías 5,6. G7 es el grafico que posee un mayor  número de categorías ciclo de negocio.
+
+
+
+
+#Gráficos de la  frecuencia de variable rotación cxp en cada clúster
+
+```{r echo=FALSE}
+par(mfrow=c(2,4))
+barplot(table(b1$rotacion_cxp),main = "Rotación cxp",ylim = c(0,10),col = c(5),xlab = "G1")
+
+barplot(table(b2$rotacion_cxp),main = "Rotación cxp",ylim = c(0,300),col = c(5),xlab = "G2")
+
+
+barplot(table(b3$rotacion_cxp),main = "Rotación cxp",ylim = c(0,100),col = c(5),xlab = "G3")
+
+barplot(table(b4$rotacion_cxp),main = "Rotación cxp",ylim = c(0,200),col = c(5),xlab = "G4")
+
+barplot(table(b5$rotacion_cxp),main = "Rotación cxp",ylim = c(0,200),col = c(5),xlab = "G5")
+
+barplot(table(b6$rotacion_cxp),main = "Rotación cxp",ylim = c(0,10),col = c(5),xlab = "G6")
+
+barplot(table(b7$rotacion_cxp),main = "Rotación cxp",ylim = c(0,200),col = c(5),xlab = "G7")
+
+barplot(table(b8$rotacion_cxp),main = "Rotación cxp",ylim = c(0,200),col = c(5),xlab = "G8")
+
+
+
+```
+En esta grafica representamos como G1 la frecuencia referida al clúster 1, G2 La frecuencia referida al clúster 2 y así sucesivamente hasta G8 que representa al clúster 8 .
+
+Se observa que el G1 y el grupo G6 tienes el menor número de cuentas por pagar al ser comparados con los demás grupos. En los grupos G2, G3, G4 y G8 predominan las cuentas por cobrar categorizadas como 1, en el G5 y en el G4 predominan el número de cuentas por cobrar tipo 4, por último, en el G7 predominan el número de cuentas por pagar pertenecientes a la categoría 2.  
+
+#Gráficos de la  frecuencia de variable rotación cxc en cada clúster
+
+```{r echo=FALSE}
+par(mfrow=c(2,4))
+barplot(table(b1$rotacion_cxc),main = "Rotación cxc",ylim = c(0,10),col = c(6),xlab = "G1")
+barplot(table(b2$rotacion_cxc),main = "Rotación cxc",ylim = c(0,200),col = c(6),xlab = "G2")
+barplot(table(b3$rotacion_cxc),main = "Rotación cxc",ylim = c(0,200),col = c(6),xlab = "G3")
+barplot(table(b4$rotacion_cxc),main = "Rotación cxc",ylim = c(0,200),col = c(6),xlab = "G4")
+barplot(table(b5$rotacion_cxc),main = "Rotación cxc",ylim = c(0,210),col = c(6),xlab = "G5")
+barplot(table(b6$rotacion_cxc),main = "Rotación cxc",ylim = c(0,10),col = c(6),xlab = "G6")
+barplot(table(b7$rotacion_cxc),main = "Rotación cxc",ylim = c(0,200),col = c(6),xlab = "G7")
+barplot(table(b8$rotacion_cxc),main = "Rotación cxc",ylim = c(0,200),col = c(6),xlab = "G8")
+```
+En esta grafica representamos como G1 la frecuencia referida al clúster 1, G2 La frecuencia referida al clúster 2 y así sucesivamente hasta G8 que representa al clúster 8 .
+
+Los grupos G1 y G6 tienes el menor número de rotación cuentas por cobrar al ser comparados con los demás grupos, las categorías rotación cuentas por cobrar tipo 4 predomina en los grupos G4, G5 y G7. El los grupos G2 y G8 predominan el número rotación de cuentas por cobrar tipo 2.
+
+#Gráficos de la  frecuencia de variable rotación inventario en cada clúster
+
+```{r echo=FALSE}
+par(mfrow=c(2,4))
+barplot(table(b1$rotacion_inventarios),main = "Rotación inventario",ylim = c(0,10),col = c(7),xlab = "G1")
+barplot(table(b2$rotacion_inventarios),main = "Rotación inventario",ylim = c(0,300),col = c(7),xlab = "G2")
+barplot(table(b3$rotacion_inventarios),main = "Rotación inventario",ylim = c(0,100),col = c(7),xlab = "G3")
+barplot(table(b4$rotacion_inventarios),main = "Rotación inventario",ylim = c(0,300),col = c(7),xlab = "G4")
+barplot(table(b5$rotacion_inventarios),main = "Rotación inventario",ylim = c(0,300),col = c(7),xlab = "G5")
+barplot(table(b6$rotacion_inventarios),main = "Rotación inventario",ylim = c(0,10),col = c(7),xlab = "G6")
+barplot(table(b7$rotacion_inventarios),main = "Rotación inventario",ylim = c(0,300),col = c(7),xlab = "G7")
+barplot(table(b8$rotacion_inventarios),main = "Rotación inventario",ylim = c(0,300),col = c(7),xlab = "G8")
+```
+En esta grafica representamos como G1 la frecuencia referida al clúster 1, G2 La frecuencia referida al clúster 2 y así sucesivamente hasta G8 que representa al clúster 8 .
+
+En el G1 y G6 encontramos un número reducido de cuentas por cobrar al ser comparado con lo demás grupos, se debe recalcar que el G6 solo tenemos una categoría la cual es 1, en los grupos G2, G7 y G8 predomina la rotación del inventario categorizado como 1, en los grupo G4 y G5 predominan el tipo de inventario 6, por último en el G3 predominan los inventarios tipo 4.
+
+#Gráficos de la  frecuencia de variable total inventario en cada clúster
+
+```{r echo=FALSE}
+par(mfrow=c(2,4))
+barplot(table(b1$totalinventory),main = "Total inventario",ylim = c(0,10),col = c(8),xlab = "G1")
+barplot(table(b2$totalinventory),main = "Total inventario",ylim = c(0,200),col = c(8),xlab = "G2")
+barplot(table(b3$totalinventory),main = "Total inventario",ylim = c(0,100),col = c(8),xlab = "G3")
+barplot(table(b4$totalinventory),main = "Total inventario",ylim = c(0,200),col = c(8),xlab = "G4")
+barplot(table(b5$totalinventory),main = "Total inventario",ylim = c(0,200),col = c(8),xlab = "G5")
+barplot(table(b6$totalinventory),main = "Total inventario",ylim = c(0,10),col = c(8),xlab = "G6")
+barplot(table(b7$totalinventory),main = "Total inventario",ylim = c(0,300),col = c(8),xlab = "G7")
+barplot(table(b8$totalinventory),main = "Total inventario",ylim = c(0,200),col = c(8),xlab = "G8")
+
+```
+En esta grafica representamos como G1 la frecuencia referida al clúster 1, G2 La frecuencia referida al clúster 2 y así sucesivamente hasta G8 que representa al clúster 8 .
+
+En el G1 y G6 encontramos un número reducido de inventario total al ser comparado con lo demás grupos,en los grupos G3, G5 y G7 predomina la rotación del inventario categorizado como 6, en los grupo G4 y G8 predominan el tipo de inventario 2, por último en el G5 predominan los inventarios tipo 3.
+
+#Gráficos de la  frecuencia de variable cxc en cada cúster
+
+```{r echo=FALSE}
+par(mfrow=c(2,4))
+barplot(table(b1$cxc),main = "cxc",ylim = c(0,10),col = c(9),xlab = "G1")
+barplot(table(b2$cxc),main = "cxc",ylim = c(0,200),col = c(9),xlab = "G2")
+barplot(table(b3$cxc),main = "cxc",ylim = c(0,100),col = c(9),xlab = "G3")
+barplot(table(b4$cxc),main = "cxc",ylim = c(0,200),col = c(9),xlab = "G4")
+barplot(table(b5$cxc),main = "cxc",ylim = c(0,200),col = c(9),xlab = "G5")
+barplot(table(b6$cxc),main = "cxc",ylim = c(0,10),col = c(9),xlab = "G6")
+barplot(table(b7$cxc),main = "cxc",ylim = c(0,200),col = c(9),xlab = "G7")
+barplot(table(b8$cxc),main = "cxc",ylim = c(0,200),col = c(9),xlab = "G8")
+
+
+```
+En esta grafica representamos como G1 la frecuencia referida al clúster 1, G2 La frecuencia referida al clúster 2 y así sucesivamente hasta G8 que representa al clúster 8 .
+
+En el G1 y G6 encontramos un número reducido de cuentas por cobrar al ser comparado con lo demás grupos, se debe recalcar que el G6 solo tenemos una categoría la cual es 6, en los grupos G2, G4 y G8 predomina la rotación del inventario categorizado como 2, en los grupo G4 y G5 predominan el tipo de inventario 3, por último en el G3 predominan los inventarios tipo 6.
+
+#Gráficos de la  frecuencia de variable expo vt en cada clúster
+
+```{r echo=FALSE}
+par(mfrow=c(2,4))
+barplot(table(b1$expo_vt),main = "expo_vt",ylim = c(0,10),col = c(3),xlab = "G1")
+barplot(table(b2$expo_vt),main = "expo_vt",ylim = c(0,300),col = c(3),xlab = "G2")
+barplot(table(b3$expo_vt),main = "expo_vt",ylim = c(0,200),col = c(3),xlab = "G3")
+barplot(table(b4$expo_vt),main = "expo_vt",ylim = c(0,300),col = c(3),xlab = "G4")
+barplot(table(b5$expo_vt),main = "expo_vt",ylim = c(0,370),col = c(3),xlab = "G5")
+barplot(table(b6$expo_vt),main = "expo_vt",ylim = c(0,10),col = c(3),xlab = "G6")
+barplot(table(b7$expo_vt),main = "expo_vt",ylim = c(0,350),col = c(3),xlab = "G7")
+barplot(table(b8$expo_vt),main = "expo_vt",ylim = c(0,300),col = c(3),xlab = "G8")
+```
+
+En esta grafica representamos como G1 la frecuencia referida al clúster 1, G2 La frecuencia referida al clúster 2 y así sucesivamente hasta G8 que representa al clúster 8 .
+
+
+En el G1 y G6 encontramos un número reducido de expo vt al ser comparado con lo demás grupos, en los grupos G3, G5, G6 y G7 predomina expo vt  categorizado como 2, en los grupo G4 y G8 predominan expo vt tipo  1, por último en el G2 predominan las inventarios categorizados como 1 y 2 obteniéndose la mismas proporción en ambos. 
+
+#Gráficos de la  frecuencia de variable expo cv en cada clúster
+
+```{r echo=FALSE}
+par(mfrow=c(2,4))
+barplot(table(b1$impo_cv),main = "expo_cv",ylim = c(0,10),col = c(4),xlab = "G1")
+barplot(table(b2$impo_cv),main = "expo_cv",ylim = c(0,300),col = c(4),xlab = "G2")
+barplot(table(b3$impo_cv),main = "expo_cv",ylim = c(0,100),col = c(4),xlab = "G3")
+barplot(table(b4$impo_cv),main = "expo_cv",ylim = c(0,300),col = c(4),xlab = "G4")
+barplot(table(b5$impo_cv),main = "expo_cv",ylim = c(0,300),col = c(4),xlab = "G5")
+barplot(table(b6$impo_cv),main = "expo_cv",ylim = c(0,10),col = c(4),xlab = "G6")
+barplot(table(b7$impo_cv),main = "expo_cv",ylim = c(0,300),col = c(4),xlab = "G7")
+barplot(table(b8$impo_cv),main = "expo_cv",ylim = c(0,300),col = c(4),xlab = "G8")
+```
+En esta grafica representamos como G1 la frecuencia referida al clúster 1, G2 La frecuencia referida al clúster 2 y así sucesivamente hasta G8 que representa al clúster 8 .
+
+En el G1 y G6 encontramos un número reducido de expo vc al ser comparado con lo demás grupos,en los grupos G2, G4 y G8 predomina expo vc categorizado como 1, en los grupo G3 y G7 predominan el tipo expo vc 2, por último en el G5 predominan los expo vc tipo 4.
+
+#Gráficos de la  frecuencia de variable cxp en cada clúster
+
+
+```{r echo=FALSE}
+par(mfrow=c(2,4))
+barplot(table(b1$cxp),main = "cxp",ylim = c(0,20),col = c(5),xlab = "G1")
+barplot(table(b2$cxp),main = "cxp",ylim = c(0,200),col = c(5),xlab = "G2")
+barplot(table(b3$cxp),main = "cxp",ylim = c(0,200),col = c(5),xlab = "G3")
+barplot(table(b4$cxp),main = "cxp",ylim = c(0,200),col = c(5),xlab = "G4")
+barplot(table(b5$cxp),main = "cxp",ylim = c(0,200),col = c(5),xlab = "G5")
+barplot(table(b6$cxp),main = "cxp",ylim = c(0,10),col = c(5),xlab = "G6")
+barplot(table(b7$cxp),main = "cxp",ylim = c(0,200),col = c(5),xlab = "G7")
+barplot(table(b8$cxp),main = "cxp",ylim = c(0,200),col = c(5),xlab = "G8")
+```
+En esta grafica representamos como G1 la frecuencia referida al clúster 1, G2 La frecuencia referida al clúster 2 y así sucesivamente hasta G8 que representa al clúster 8 .
+
+En el G1 y G6 encontramos un número reducido de cuentas por pagar al ser comparado con lo demás grupos, se debe recalcar que el G6 solo tenemos una categoría la cual es 6, en los grupos G2, G5 y G8 predomina la rotación del inventario categorizado como 2, en los grupo G3 y G7 predominan el tipo de inventario 6, por último en el G4 predominan los inventarios tipo 1.
+
+En las siguiente tabla se presenta el valor promedio.pagos_pn y promedio.pagos_pj para cada uno de los los clúster.
+
+```{r echo=FALSE}
+pagos_pj1 <- apply(b1[38], 2, mean)
+pagos_pj2 <- apply(b2[38], 2, mean)
+pagos_pj3 <- apply(b3[38], 2, mean)
+pagos_pj4 <- apply(b4[38], 2, mean)
+pagos_pj5 <- apply(b5[38], 2, mean)
+pagos_pj6 <- apply(b6[38], 2, mean)
+pagos_pj7 <- apply(b7[38], 2, mean)
+pagos_pj8 <- apply(b8[38], 2, mean)
+pagos_pj <- c(pagos_pj1,pagos_pj2,pagos_pj3,pagos_pj4,pagos_pj5,pagos_pj6,pagos_pj7,pagos_pj8)
+
+pagos_cv1 <- apply(b1[39], 2, mean)
+pagos_cv2 <- apply(b2[39], 2, mean)
+pagos_cv3 <- apply(b3[39], 2, mean)
+pagos_cv4 <- apply(b4[39], 2, mean)
+pagos_cv5 <- apply(b5[39], 2, mean)
+pagos_cv6 <- apply(b6[39], 2, mean)
+pagos_cv7 <- apply(b7[39], 2, mean)
+pagos_cv8 <- apply(b8[39], 2, mean)
+
+pagos_cv <- c(pagos_cv1,pagos_cv2,pagos_cv3,pagos_cv4,pagos_cv5,pagos_cv6,pagos_cv7,pagos_cv8)
+
+tabla.pj.cv <- cbind(promedio.pagos_pn= pagos_cv,promedio.pagos_pj=pagos_pj)
+
+row.names(tabla.pj.cv)=c("clouster1","clouster2","clouster3","clouster4","clouster5","clouster6","clouster7","clouster8")
+tabla.pj.cv
+
+```
+
+
+
+En las siguiente tabla se presenta el valor promedio.recaudos_pn y promedio.recaudos_pj para cada uno de los los clúster.
+
+```{r echo=FALSE}
+recaudos_pj1 <-  apply(b1[42], 2, mean)
+recaudos_pj2 <-  apply(b2[42], 2, mean)
+recaudos_pj3 <-  apply(b3[42], 2, mean)
+recaudos_pj4 <-  apply(b4[42], 2, mean)
+recaudos_pj5 <-  apply(b5[42], 2, mean)
+recaudos_pj6 <-  apply(b6[42], 2, mean)
+recaudos_pj7 <-  apply(b7[42], 2, mean)
+recaudos_pj8 <-  apply(b8[42], 2, mean)
+
+recaudos_pj <- c(recaudos_pj1,recaudos_pj2,recaudos_pj3,recaudos_pj4,recaudos_pj5,recaudos_pj6,recaudos_pj7,recaudos_pj8)
+
+recaudos_pn1 <- apply(b1[43], 2, mean)
+recaudos_pn2 <- apply(b2[43], 2, mean)
+recaudos_pn3 <- apply(b3[43], 2, mean)
+recaudos_pn4 <- apply(b4[43], 2, mean)
+recaudos_pn5 <- apply(b5[43], 2, mean)
+recaudos_pn6 <- apply(b6[43], 2, mean)
+recaudos_pn7 <- apply(b7[43], 2, mean)
+recaudos_pn8 <- apply(b8[43], 2, mean)
+
+recaudos_pn <- c(recaudos_pn1,recaudos_pn2,recaudos_pn3,recaudos_pn4,recaudos_pn5,recaudos_pn6,recaudos_pn7,recaudos_pn8)
+
+tabla.recaudos <- cbind(promedio.recaudos_pn=recaudos_pn,promedio.recaudos_pj =recaudos_pj)
+
+row.names(tabla.recaudos)=c("clouster1","clouster2","clouster3","clouster4","clouster5","clouster6","clouster7","clouster8")
+
+tabla.recaudos
+```
+
+En la siguiente tabla se presenta el valor promedio de los servicios ofrecidos a las empresas en cada clúster.
+
+```{r echo=FALSE}
+media.conjunto1 <- mean(apply(b1[3:32], 1, mean))
+media.conjunto2 <- mean(apply(b2[3:32], 1, mean))
+media.conjunto3 <- mean(apply(b3[3:32], 1, mean))
+media.conjunto4 <- mean(apply(b4[3:32], 1, mean))
+media.conjunto5 <- mean(apply(b5[3:32], 1, mean))
+media.conjunto6 <- mean(apply(b6[3:32], 1, mean))
+media.conjunto7 <- mean(apply(b7[3:32], 1, mean))
+media.conjunto8 <- mean(apply(b8[3:32], 1, mean))
+medias <- c(media.conjunto1,media.conjunto2,media.conjunto3,
+            media.conjunto4,media.conjunto5,media.conjunto6,media.conjunto7,media.conjunto8)
+
+
+tabla_p <- cbind(Promedio_en_canales_y_servicios=c(medias))
+row.names(tabla_p)=c("clouster1","clouster2","clouster3","clouster4","clouster5","clouster6","clouster7","clouster8")
+tabla_p
+```
+
+Las siguientes  tablas podemos encontrar el valor promedio para cada uno se los servicios ofrecidos por la empresa a los clientes en cada clúster.
+
+```{r echo=FALSE}
+media.productos.grupo1 <- apply(b1[3:32], 2, mean)
+media.productos.grupo2 <- apply(b2[3:32], 2, mean)
+media.productos.grupo3 <- apply(b3[3:32], 2, mean)
+media.productos.grupo4 <- apply(b4[3:32], 2, mean)
+media.productos.grupo5 <- apply(b5[3:32], 2, mean)
+media.productos.grupo6 <- apply(b6[3:32], 2, mean)
+media.productos.grupo7 <- apply(b7[3:32], 2, mean)
+media.productos.grupo8 <- apply(b8[3:32], 2, mean)
+
+cbind(media.productos.grupo1,media.productos.grupo2)
+
+
+```
+
+***
+
+```{r echo=FALSE}
+cbind(media.productos.grupo3,media.productos.grupo4)
+
+```
+
+***
+
+```{r echo=FALSE}
+cbind(media.productos.grupo5,media.productos.grupo6)
+
+```
+
+***
+
+```{r echo=FALSE}
+cbind(media.productos.grupo7,media.productos.grupo8)
+```
+
+
+#Caracterización de los clientes
+
+Con la información extraída de las gráficas anteriores relacionadas con las características de los clientes pertenecientes a cada clúster construimos la siguiente tabla, la cual ofrece un consolidado de las características que deben cumplir las empresas para pertenecer a cada uno de los grupos. Ademas permite diferencia visualmente las caracteristicas  entre grupos mostrando en otros color(Diferente al gris) las que no pertenecen a cada grupo.
+
+
